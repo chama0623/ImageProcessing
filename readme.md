@@ -40,8 +40,10 @@
 
 物体検出
 - HOG特徴量とSVMによる自動車検出  
-- YOLO v3  
+- SSDの実装
 
 ## Reference
 画像処理100本ノック https://github.com/minido/Gasyori100knock-1  
+ディジタル画像処理[改定第2版]
 画像認識 原田達也 著  
+物体検出とGAN, オートエンコーダー, 画像処理入門 チーム・カルポ
