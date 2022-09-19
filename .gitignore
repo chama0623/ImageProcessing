@@ -1,1 +1,2 @@
-/ObjectDetection/Data/*
+ObjectDetection/SSD/data/*
+ObjectDetection/SSD/weights/*
