@@ -1,11 +1,15 @@
+from __future__ import annotations
+import difflib
 from inspect import Parameter
 import os.path as osp
+import xml.etree.ElementTree as ElementTree
+import numpy as np
 
 def make_filepath_list(rootpath):
     """make list of images and annotations
-    
+
     Args:
-    rootpath(str) : データフォルダのルートパス
+    rootpath(str): データフォルダのルートパス
     
     Returns:
     train_img_list : 訓練用イメージのパスリスト
@@ -40,4 +44,60 @@ def make_filepath_list(rootpath):
         val_img_list.append(img_path)
         val_anno_list.append(anno_path)
         
-    return train_img_list, train_anno_list, val_img_list, val_anno_list      
+    return train_img_list, train_anno_list, val_img_list, val_anno_list
+
+class GetBBoxAndLabel:
+    """annotation one image
+    """
+    
+    def __init__(self, classes):
+        """constructor
+
+        Args:
+            classes (list): list of classes
+        """
+
+        self.classes = classes
+        
+    def __call__(self, xml_path, width, height):
+        """method execute from instance
+
+        Args:
+            xml_path (str): path of xml
+            width (int): width of image (for normalize)
+            height (int): height of image (for normalize)
+        
+        Returns(ndarray):
+        [[xmin, ymin, xmax, ymax, index], ...]
+        number of element equals object in the image
+        """
+        
+        annotations = []
+        xml = ElementTree.parse(xml_path).getroot() # get path
+        
+        # get info from xml
+        for obj in xml.iter("object"):
+            difficult = int(obj.find("difficult").text) # get difficult
+            if difficult == 1:
+                continue # not append to annotations list
+            
+            bndbox = []
+            name = obj.find("name").text.lower().strip()
+            bbox = obj.find("bndbox")
+            grid = ["xmin", "ymin", "xmax", "ymax"]
+            
+            for gr in (grid):
+                axis_value = int(bbox.find(gr).text)-1 # origin adjustment
+                # normalization
+                if gr == "xmin" or gr == "xmax":
+                    axis_value /= width
+                else:
+                    axis_value /= height
+                
+                bndbox.append(axis_value)
+                
+            label_idx = self.classes.index(name)
+            bndbox.append(label_idx)
+            annotations += [bndbox]
+        
+        return np.array(annotations)
