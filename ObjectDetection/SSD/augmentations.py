@@ -20,10 +20,10 @@ class Compose(object): # objectはextendsを明記しなくてもよい
         """
         self.transforms = transforms
         
-        def __call__(self, img, boxes=None, labels=None):
-            for t in self.transforms:
-                img, boxes, labels = t(img, boxes, labels)
-            return img, boxes, labels
+    def __call__(self, img, boxes=None, labels=None):
+        for t in self.transforms:
+            img, boxes, labels = t(img, boxes, labels)
+        return img, boxes, labels
         
 class ConvertFromInts(object):
     """transform int pixel data to float32
@@ -90,7 +90,7 @@ class RandomContrast(object):
         return image, boxes, labels
     
 class ConvertColor(object):
-    """transform GBR to HSV or HSV to GBR
+    """transform BGR to HSV or HSV to BGR
 
     Args:
         object (_type_): _description_
@@ -103,7 +103,7 @@ class ConvertColor(object):
     def __call__(self, image, boxes=None, labels=None):
         if self.current == "BGR" and self.transform == "HSV":
             image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        if self.current == "HSV" and self.transform == "BGR":
+        elif self.current == "HSV" and self.transform == "BGR":
             image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
         else:
             raise NotImplementedError # 実装されていないことを表すエラー
@@ -140,13 +140,13 @@ class RandomHue(object):
         assert delta >= 0.0 and delta <=360.0
         self.delta = delta
         
-        def __call__(self, image, boxes=None, labels=None):
-            if random.randint(2):
-                image[:,:,0] += random,uniform(-self.delta, self.delta)
-                image[:,:,0][image[:,:,0] > 360.0] -=360.0
-                image[:,:,0][image[:,:,0] < 0.0] +=360.0
-            
-            return image, boxes, labels
+    def __call__(self, image, boxes=None, labels=None):
+        if random.randint(2):
+            image[:,:,0] += random.uniform(-self.delta, self.delta)
+            image[:,:,0][image[:,:,0] > 360.0] -=360.0
+            image[:,:,0][image[:,:,0] < 0.0] +=360.0
+        
+        return image, boxes, labels
         
 class RandomLightingNoise(object):
     """add lighting noise randomly
@@ -324,7 +324,7 @@ def jaccard_numpy(box_a, box_b):
     
     inter = intersect(box_a, box_b) # 共通部分
     area_a = ((box_a[:, 2]-box_a[:, 0]) * (box_a[:, 3]-box_a[:, 1]))
-    area_b = ((box_b[:, 2]-box_b[:, 0]) * (box_b[:, 3]-box_b[:, 1]))
+    area_b = ((box_b[2]-box_b[0]) * (box_b[3]-box_b[1]))
     union = area_a + area_b -inter # 和集合
     return inter/union
 
