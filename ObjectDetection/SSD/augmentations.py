@@ -301,3 +301,120 @@ class SubtractMeans(object):
         image = image.astype(np.float32)
         image -= self.mean
         return image, boxes, labels
+    
+def intersect(box_a, box_b):
+    """detect overlaping area between box_a and box_b
+    """
+    
+    max_xy = np.minimum(box_a[:,2:], box_b[2:])
+    min_xy = np.maximum(box_a[:,:2], box_b[:2])
+    inter = np.clip((max_xy - min_xy), a_min=0, a_max=np.inf)
+    return inter[:, 0] * inter[:, 1]
+
+def jaccard_numpy(box_a, box_b):
+    """calculate jaccard overlap
+
+    Args:
+        box_a ([num_boxes, 4]): multiple bounding boxes
+        box_b ([4]): Single bounding box
+    
+    Return:
+    jaccard overlap ([box_a.shape[0], box_a.shape[1]]): jaccard overlap
+    """
+    
+    inter = intersect(box_a, box_b) # 共通部分
+    area_a = ((box_a[:, 2]-box_a[:, 0]) * (box_a[:, 3]-box_a[:, 1]))
+    area_b = ((box_b[:, 2]-box_b[:, 0]) * (box_b[:, 3]-box_b[:, 1]))
+    union = area_a + area_b -inter # 和集合
+    return inter/union
+
+class RandomSampleCrop(object):
+    """transform bounding box fitting with image
+
+    Arguments:
+        img (Image): output image in a training
+        boxes (Tensor): original bounding box
+        labels (Tensor): label of bounding box
+        mode (float tuple): jaccard overlap
+    
+    Returns:
+        img (Image):  trimmed image
+        boxes (Tensor): adjusted bounding boxes
+        labels (Tensor): label of boundig boxes
+    """
+    
+    def __init__(self):
+        self.sample_options = (
+            None, # 原画像全体を使用
+            (0.1, None),
+            (0.3, None),
+            (0.7, None),
+            (0.9, None),
+            (None, None), # パッチをランダムにサンプリング
+        )
+        self.sample_options = np.array(self.sample_options, dtype=object)
+        
+    def __call__(self, image, boxes=None, labels=None):
+        height, width, _ = image.shape
+        while True:
+            mode = random.choice(self.sample_options)
+            if mode is None:
+                return image, boxes, labels
+            
+            min_iou, max_iou = mode
+            if min_iou is None:
+                min_iou = float("-inf")
+            if max_iou is None:
+                max_iou = float("inf")                
+                
+            for _ in range(50):
+                current_image = image
+                
+                w = random.uniform(0.3*width, width)
+                h = random.uniform(0.3*height, height)
+                
+                if h/w < 0.5 or h/w >2: # check aspect ratio 
+                    continue
+                
+                left = random.uniform(width - w)
+                top = random.uniform(height - h)
+                
+                # make trimming field
+                rect = np.array([int(left), int(top), int(left+w), int(top+h)])
+                
+                # calc jaccard overlap between original boxes and rect
+                overlap = jaccard_numpy(boxes, rect)
+                
+                # check iou
+                if overlap.min() < min_iou and max_iou < overlap.max():
+                    continue
+                
+                # trimming
+                current_image = current_image[rect[1]:rect[3], rect[0]:rect[2],:]
+                
+                # gt boxとサンプリングしたパッチのセンターを合わせる
+                centers = (boxes[:, :2] + boxes[:, 2:]) /2.0
+                
+                # 左上にあるすべてのgt boxをマスク
+                m1 = (rect[0] < centers[:, 0]) * (rect[1] < centers[:, 1])
+                # 右下にあるすべてのgt boxをマスク
+                m2 = (rect[2] < centers[:, 0]) * (rect[3] < centers[:, 1])
+                
+                mask = m1*m2
+                
+                # 有効なマスクがあるか
+                if not mask.any():
+                    continue
+                
+                # gt box, labelを取得
+                current_boxes = boxes[mask, :].copy()
+                current_labels = labels[mask]
+                
+                # ボックスの左上隅を使用する
+                current_boxes[:, :2] = np.maximum(current_boxes[:, :2], rect[:2])
+                # トリミングされた状態に合わせる
+                current_boxes[:, :2] -= rect[:2]
+                current_boxes[:, :2] = np.minimum(current_boxes[:, 2:], rect[2:])
+                current_boxes[:, :2] -= rect[:2]
+                
+                return current_image, current_boxes, current_labels
