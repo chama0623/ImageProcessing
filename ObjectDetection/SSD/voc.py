@@ -5,6 +5,9 @@ import os.path as osp
 import xml.etree.ElementTree as ElementTree
 import numpy as np
 from augmentations import Compose, ConvertColor, ConvertFromInts, ToAbsoluteCoords, PhotometricDistort, Expand, RandomSampleCrop, RandomMirror, ToPercentCoords, Resize, SubtractMeans
+import torch
+import torch.utils.data as data
+import cv2
 
 def make_filepath_list(rootpath):
     """make list of images and annotations
@@ -132,3 +135,81 @@ class DataTransform(object):
         
     def __call__(self, img, phase, boxes, labels):
         return self.transform[phase](img, boxes, labels)
+    
+class PreprocessVOC2012(data.Dataset):
+    """extends torch.utils.data.Dataset(abstract)
+       doc : https://pytorch.org/docs/stable/data.html
+       DataTransformでVOC2012データセットを前処理して次の返す
+       
+       前処理後のイメージ[R, G, B](Tensor)
+       BBoxとlabel(ndarray)
+       イメージの高さ・幅(int)
+
+    Args:
+        data (_type_): _description_
+    """
+    
+    def __init__(self, img_list, anno_list, phase, transform, get_bbox_label):
+        """constructor
+
+        Args:
+            img_list (list): list of image file path
+            anno_list (list): list of annotation file path
+            phase (str): "train" or "test"
+            transform (object): class DataTransform
+            get_bbox_label (object): class GetBBoxAndLabel
+        """
+        self.img_list = img_list
+        self.anno_list = anno_list
+        self.phase = phase
+        self.transform = transform
+        self.get_bbox_label = get_bbox_label
+        
+    def __len__(self):
+        return len(self.img_list)
+        
+    def __getitem__(self, index):
+        """データの回数だけイテレートする
+
+        Args:
+            index (int): index of image
+                
+        Returns:
+            im(Tensor): 前処理後のイメージを格納した3階テンソル
+            (3, 高さのピクセル, 幅のピクセル)
+            bl(ndarray): BBoxとlabelの2次元リスト
+        """
+            
+        im, bl, _, _ = self.pull_item(index)
+        return im, bl
+        
+    def pull_item(self, index):
+        """前処理後のテンソル形式のイメージデータ, アノテーション, イメージの高さ, 幅を取得する
+
+        Args:
+            index (int): index of image
+            
+        Returns:
+            img(Tensor): 前処理後のイメージ(3, 高さのピクセル数, 幅のピクセル数)
+            boxlbl(ndarray): BBoxとlabelの2次元配列
+            height(int): イメージの高さ
+            width(int): イメージの幅
+        """
+        img_path = self.img_list[index]
+        img = cv2.imread(img_path)
+        height, width, _ = img.shape
+            
+        anno_file_path = self.anno_list[index]
+        bbox_label = self.get_bbox_label(anno_file_path, width, height)
+        
+        img, boxes, labels = self.transform(
+            img,
+            self.phase,
+            bbox_label[:, :4],
+            bbox_label[:, 4]
+        )
+        
+        img = torch.from_numpy(img[:, :, (2, 1, 0)]).permute(2, 0, 1)
+        boxlbl = np.hstack((boxes, np.expand_dims(labels, axis=1)))
+        
+        return img, boxlbl, height, width
