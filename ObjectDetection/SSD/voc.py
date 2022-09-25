@@ -213,3 +213,24 @@ class PreprocessVOC2012(data.Dataset):
         boxlbl = np.hstack((boxes, np.expand_dims(labels, axis=1)))
         
         return img, boxlbl, height, width
+    
+def multiobject_collate_fn(batch):
+    """イメージとイメージに対するアノテーションをミニバッチの数だけ生成する
+
+    Args:
+        batch (tuple): PreprocessVOC2012クラスの__getitem__関数で返される要素数2のタプル
+    
+    Returns:
+        imgs(Tensor): 前処理後のイメージ(RGB)をミニバッチの数だけ格納した4階テンソル(batch_size, 3, 300, 300)
+        targets(list): [物体数, 5]の2階テンソル
+    """
+    
+    imgs = []
+    targets = []
+    for sample in batch:
+        imgs.append(sample[0]) # タプルの第一要素はイメージ
+        targets.append(torch.FloatTensor(sample[1])) # タプルの第二要素はB-Boxとlabel
+        
+    imgs = torch.stack(imgs, dim=0)
+    
+    return imgs, targets
