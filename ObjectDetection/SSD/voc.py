@@ -54,7 +54,7 @@ class GetBBoxAndLabel:
     """annotation one image
     """
     
-    def __init__(self, classes):
+    def __init__(self, classes): #__method__ をダンダーと呼ぶ
         """constructor
 
         Args:
