@@ -1,2 +1,3 @@
 ObjectDetection/SSD/data/*
 ObjectDetection/SSD/weights/*
+ObjectDetection/SSD/sample/*
