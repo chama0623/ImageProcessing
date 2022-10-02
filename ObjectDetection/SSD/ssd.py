@@ -40,3 +40,35 @@ def make_vgg():
                conv7, nn.ReLU(inplace=True)]
     
     return nn.ModuleList(layers)
+
+def make_extras():
+    """generate extras model
+    
+    Returns:
+    (nn.ModuleList) : extras module list
+    """
+    layers = []
+    in_channels = 1024 # vggから出力される画像データのチャネル数
+    
+    cfg = [256, 512, # extras1
+           128, 256, # extras2
+           128, 256, # extras3
+           128, 256] # extras4
+    
+    # extras1
+    layers += [nn.Conv2d(in_channels, cfg[0], kernel_size=(1))]
+    layers += [nn.Conv2d(cfg[0], cfg[1], kernel_size=(3), stride=2, padding=1)]
+    
+    # extras2
+    layers += [nn.Conv2d(cfg[1], cfg[2], kernel_size=(1))]
+    layers += [nn.Conv2d(cfg[2], cfg[3], kernel_size=(3), stride=2, padding=1)]
+    
+    # extras3
+    layers += [nn.Conv2d(cfg[3], cfg[4], kernel_size=(1))]
+    layers += [nn.Conv2d(cfg[4], cfg[5], kernel_size=(3))]
+    
+    # extras4
+    layers += [nn.Conv2d(cfg[5], cfg[6], kernel_size=(1))]
+    layers += [nn.Conv2d(cfg[6], cfg[7], kernel_size=(3))]
+    
+    return nn.ModuleList(layers)

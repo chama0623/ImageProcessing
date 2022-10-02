@@ -155,4 +155,9 @@ SSDモデルはVGG, extras, loc, confの4つのネットワークを組み合わ
 
 ### VGG
 VGGのアーキテクチャを次に示す. このネットワークをssd.pyのmake_vgg関数に定義する.    
-![img](./readme_contents/ssd_architecture.png)
+![img](./readme_contents/ssd_vgg.png)
+
+### extrasネットワーク
+extrasネットワークのアーキテクチャを次に示す. このネットワークをssd.pyのmake_extras関数に定義する. 
+
+![img](./readme_contents/ssd-extras.png)
