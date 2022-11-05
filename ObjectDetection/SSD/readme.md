@@ -166,3 +166,8 @@ extrasネットワークのアーキテクチャを次に示す. このネット
 locネットワークのアーキテクチャを次に示す. このネットワークをssd.pyのmake_loc関数に定義する. locネットワークは層が縦に連なった構造ではなく, out1～out6の出力を各畳み込み層に入力している.
 
 ![img](./readme_contents/ssd_loc.png)
+
+### confネットワーク
+confネットワークのアーキテクチャを次に示す. このネットワークをssd.pyのmake_conf関数に定義する.
+
+![img](./readme_contents/ssd_conf.png)

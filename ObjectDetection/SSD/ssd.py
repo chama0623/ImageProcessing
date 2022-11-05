@@ -74,13 +74,13 @@ def make_extras():
     return nn.ModuleList(layers)
 
 def make_loc(dbox_num=[4, 6, 6, 6, 4, 4]):
-    """get default boxes offset
+    """generate loc network
 
     Args:
-        dbox_num(list) : loc1～loc6までに準備されているoffsetの数
+        dbox_num(list) : loc1～loc6までに用意されているoffsetの数
     
     Returns:
-    (nn.MoudleList) : locモジュールのリスト
+        (nn.MoudleList) : locモジュールのリスト
     """
     
     loc_layers = []
@@ -94,3 +94,24 @@ def make_loc(dbox_num=[4, 6, 6, 6, 4, 4]):
     
     return nn.ModuleList(loc_layers)
 
+def make_conf(classes_num=21, dbox_num=[4, 6, 6, 6, 4, 4]):
+    """generate conf network
+
+    Args:
+        classes_num (int, optional): class number. Defaults to 21.
+        dbox (list, optional): loc1～loc6までに用意されているoffsetの数. Defaults to [4, 6, 6, 6, 4, 4].
+    
+    Returns:
+        (nn.MoudleList) : locモジュールのリスト
+    """
+    
+    conf_layers = []
+    
+    conf_layers += [nn.Conv2d(512, dbox_num[0]*classes_num, kernel_size=3, padding=1)]
+    conf_layers += [nn.Conv2d(1024, dbox_num[1]*classes_num, kernel_size=3, padding=1)]
+    conf_layers += [nn.Conv2d(512, dbox_num[2]*classes_num, kernel_size=3, padding=1)]
+    conf_layers += [nn.Conv2d(256, dbox_num[3]*classes_num, kernel_size=3, padding=1)]
+    conf_layers += [nn.Conv2d(256, dbox_num[4]*classes_num, kernel_size=3, padding=1)]
+    conf_layers += [nn.Conv2d(256, dbox_num[5]*classes_num, kernel_size=3, padding=1)]
+    
+    return nn.ModuleList(conf_layers)
