@@ -161,3 +161,8 @@ VGGのアーキテクチャを次に示す. このネットワークをssd.pyの
 extrasネットワークのアーキテクチャを次に示す. このネットワークをssd.pyのmake_extras関数に定義する. 
 
 ![img](./readme_contents/ssd-extras.png)
+
+### locネットワーク
+locネットワークのアーキテクチャを次に示す. このネットワークをssd.pyのmake_loc関数に定義する. locネットワークは層が縦に連なった構造ではなく, out1～out6の出力を各畳み込み層に入力している.
+
+![img](./readme_contents/ssd_loc.png)

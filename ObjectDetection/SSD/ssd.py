@@ -72,3 +72,25 @@ def make_extras():
     layers += [nn.Conv2d(cfg[6], cfg[7], kernel_size=(3))]
     
     return nn.ModuleList(layers)
+
+def make_loc(dbox_num=[4, 6, 6, 6, 4, 4]):
+    """get default boxes offset
+
+    Args:
+        dbox_num(list) : loc1～loc6までに準備されているoffsetの数
+    
+    Returns:
+    (nn.MoudleList) : locモジュールのリスト
+    """
+    
+    loc_layers = []
+    
+    loc_layers += [nn.Conv2d(512, dbox_num[0]*4, kernel_size=3, padding=1)]
+    loc_layers += [nn.Conv2d(1024, dbox_num[1]*4, kernel_size=3, padding=1)]
+    loc_layers += [nn.Conv2d(512, dbox_num[2]*4, kernel_size=3, padding=1)]
+    loc_layers += [nn.Conv2d(256, dbox_num[3]*4, kernel_size=3, padding=1)]
+    loc_layers += [nn.Conv2d(256, dbox_num[4]*4, kernel_size=3, padding=1)]
+    loc_layers += [nn.Conv2d(256, dbox_num[5]*4, kernel_size=3, padding=1)]
+    
+    return nn.ModuleList(loc_layers)
+
