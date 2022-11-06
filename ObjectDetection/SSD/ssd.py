@@ -1,4 +1,6 @@
+import torch
 import torch.nn as nn
+import torch.nn.init as init
 
 def make_vgg():
     """generate vgg model
@@ -115,3 +117,39 @@ def make_conf(classes_num=21, dbox_num=[4, 6, 6, 6, 4, 4]):
     conf_layers += [nn.Conv2d(256, dbox_num[5]*classes_num, kernel_size=3, padding=1)]
     
     return nn.ModuleList(conf_layers)
+
+class L2Norm(nn.Module):
+    
+    def __init__(self, input_channels=512, scale=20):
+        super(L2Norm, self).__init__()
+        
+        self.weight = nn.parameter(torch.Tensor(input_channels))
+        self.scale = scale # 重みの初期値
+        self.reset_parameters() # 重みを初期化
+        self.eps = 1e-10 # L2ノルムの値値に加算する極小値
+        
+        def reset_parameters(self):
+            """重みをscaleで初期化する
+            """
+            init.constant_(self.weight, self.scale)
+        
+    def forward(self, x):
+        """L2Normの順伝搬を行う
+
+        Args:
+            x (Tensor): (batch_size, 512, 38, 38)
+
+        Returns:
+            Tensor: L2ノルムで正規化した後にsacleの重みを適用したテンソル(batch_size, 512, 38, 38)
+        """
+        
+        # normを計算
+        norm = x.pow(2).sum(dim=1, keepdim=True).sqrt()+self.eps
+        # 正規化
+        x = torch.div(x, norm)
+        
+        # weightを4階テンソルに変形
+        weights = self.weight.unsqueeze(0).unsqueeze(2).unsqueeze(3).expand_as(x)
+        # xに重みを適用
+        out = weights*x
+        return out
