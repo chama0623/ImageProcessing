@@ -1,7 +1,9 @@
 from re import I
+from turtle import forward
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+from torch.autograd import Function
 from itertools import product as product
 from math import sqrt as sqrt
 
@@ -291,4 +293,50 @@ def nonmaximum_suppress(boxes, scores, overlap=0.5, top_k=200):
         idx = idx[IoU.le(overlap)]
         
     return keep, count
+
+class Detect(Function):
+    @staticmethod
+    def forward(ctx, loc_data, conf_data, dbox_list):
+        ctx.softmax = nn.Softmax(dim=-1)
+        # BBoxを抽出するときの閾値
+        ctx.conf_thresh = 0.01
+        # NMSを実施するBBox数の上限
+        ctx.top_k = 200
+        # IoUの閾値
+        ctx.nms_thresh = 0.45
         
+        # ミニバッチサイズ
+        batch_num = loc_data.size(0)
+        # クラス数
+        classes_num = conf_data.size(2)
+        
+        # ソフトマックス関数をクラスに実行
+        conf_data = ctx.softmax(conf_data)
+        conf_preds = conf_data.transpose(2,1)
+        
+        # 出力Tensorを用意
+        output = torch.zeros(batch_num, classes_num, ctx.top_k, 5)
+        
+        for i in range(batch_num):
+            decoded_boxes = decode(loc_data[i], dbox_list)
+            
+            conf_scores = conf_preds[i].clone()
+            
+            for cl in range(1, classes_num):
+                c_mask = conf_scores[cl].gt(ctx.conf_thresh)
+                
+                scores = conf_scores[cl][c_mask]
+                
+                if scores.nelement() == 0:
+                    continue
+                
+                l_mask = c_mask.unsqueeze(1).expand_as(decoded_boxes)
+                
+                boxes = decoded_boxes[l_mask].view(-1, 4)
+                
+                ids, count = nonmaximum_suppress(boxes, scores, ctx.nms_thresh, ctx.top_k)
+                
+                output[i, cl, :count] = torch.cat((scores[ids[:count]].unsqueeze(1),
+                                                   boxes[ids[:count]]), 1)
+                
+        return output
