@@ -199,3 +199,14 @@ $$x'_i = \frac{x_i}{norm}$$
 - 3:1の比率の長方形
 - 1:3の比率の長方形
 
+## 順伝搬処理の実装
+順伝搬の処理はデフォルトボックスをバウンディングボックスに変換するdecode関数, Non Maximum Suppressionを行うnonmaximum_supress関数, Detectクラスの3つから実装される. 
+
+### decode関数
+decode関数はデフォルトボックスをバウンディングボックスに変換する関数である. locネットワークはデフォルトボックスの情報$(cx_d, cy_d, w_d, h_d)$に対してそれぞれのオフセット値$(\Delta cx, \Delta cy, \Delta w, \Delta h)$を出力する. この情報を元に, バウンディングボックスの座標$(cx, cy, w, h)$を次で計算する. この計算で得られた値は(中心のx座標, 中心のy座標, 幅, 高さ)であるため(xの最小値, yの最小値, xの最大値, yの最大値)に変換する必要がある.
+
+$$cx = cx_d+0.1\Delta cx\times w_d$$
+$$cy = cy_d+0.1\Delta cy\times h_d$$
+$$w = w_d \times e^{0.2 \Delta w}$$
+$$w = h_d \times e^{0.2 \Delta h}$$
+

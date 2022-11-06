@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+from itertools import product as product
+from math import sqrt as sqrt
 
 def make_vgg():
     """generate vgg model
@@ -153,3 +155,70 @@ class L2Norm(nn.Module):
         # xに重みを適用
         out = weights*x
         return out
+    
+class DBox(object):
+    def __init__(self, cfg):
+        super(DBox, self).__init__()
+        self.image_size = cfg["input_size"] # 300
+        self.feature_maps = cfg["feature_maps"] # [38, 19, 10, 5, 3, 1]
+        self.num_priors = len(cfg["feature_maps"]) # 6
+        self.steps = cfg["steps"] # DBoxのサイズ [8, 16, 32, 64, 100, 300]
+        self.min_sizes = cfg["min_sizes"] # 小さい正方形のサイズ [30, 60, 111, 162, 213, 264]
+        self.max_sizes = cfg["max_sizes"] # 大きい正方形のサイズ [60, 111, 162, 213, 264, 315]
+        self.aspect_ratios = cfg["aspect_ratios"] # アスペクト比[[2], [2,3], [2,3], [2,3], [2], [2]]
+        
+    def make_dbox_list(self):
+        """Default Boxを生成
+
+        Returns:
+            Tensor: [cx, cy, width, height]を格納した2階テンソル(8732, 4)
+        """
+        # [[cx, xy, widh, weight], ...]
+        mean = []
+        for k, f in enumerate(self.feature_maps):
+            for i, j in product(range(f), repeat=2):
+                # 300 / [8, 16, 32, 64, 100, 300]
+                f_k= self.image_size/ self.steps[k]
+                # DBoxの中心座標(正規化)を計算
+                cx = (j+0.5)/f_k
+                cy = (i+0.5)/f_k
+                
+                # 小さい正方形
+                s_k = self.min_sizes[k]/self.image_size
+                mean += [cx, cy, s_k, s_k]
+                
+                # 大きい正方形
+                s_k_prime = sqrt(s_k*(self.max_sizes[k]/self.image_size))
+                mean += [cx, cy, s_k_prime, s_k_prime]
+                
+                # 長方形
+                for ar in self.aspect_ratios[k]:
+                    mean += [cx, cy, s_k*sqrt(ar), s_k/sqrt(ar)]
+                    mean += [cx, cy, s_k/sqrt(ar), s_k*sqrt(ar)]
+                    
+        # 2階テンソルに変換
+        output = torch.Tensor(mean).view(-1, 4)
+        # DBoxの値チェック
+        output.clamp_(max=1, min=0)
+        return output
+    
+def decode(loc, dbox_list):
+    """デフォルトボックスからバウンディングボックスに変換する関数
+
+    Args:
+        loc (Tensor): output of loc(8721, 4)
+        dbox_list (Tensor): [[cx, cy, width, height]]のTensor(8732, 4)
+
+    Returns:
+        _type_: _description_
+    """
+    
+    boxes = torch.cat((
+        dbox_list[:, :2] + loc[:,:2]*0.1*dbox_list[:, 2:],
+        dbox_list[:, 2:]*torch.exp(loc[:, 2:]*0.2)
+    ), dim=1)
+    
+    boxes[:, :2] -= boxes[:, 2:]/2
+    boxes[:, 2:] += boxes[:, :2]
+    
+    return boxes
