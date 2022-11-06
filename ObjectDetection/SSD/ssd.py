@@ -1,3 +1,4 @@
+from re import I
 import torch
 import torch.nn as nn
 import torch.nn.init as init
@@ -222,3 +223,72 @@ def decode(loc, dbox_list):
     boxes[:, 2:] += boxes[:, :2]
     
     return boxes
+
+def nonmaximum_suppress(boxes, scores, overlap=0.5, top_k=200):
+    
+    count=0
+    keep = scores.new(scores.size(0)).zero_().long()
+    
+    # BBoxの面積計算
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = boxes[:, 2]
+    y2 = boxes[:, 3]
+    
+    area = torch.mul(x2-x1, y2-y1) 
+    
+    tmp_x1 = boxes.new()
+    tmp_y1 = boxes.new()
+    tmp_x2 = boxes.new()
+    tmp_y2 = boxes.new()
+    tmp_w = boxes.new()
+    tmp_h = boxes.new()
+    
+    # scoresを昇順に並べ替える
+    v, idx = scores.sort(0)
+    # 上位200個を抽出
+    idx = idx[-top_k:]
+    
+    # idxの要素数が0でないとき
+    while idx.numel > 0:
+        i = idx[-1] # 確信度が最大のインデックス
+        keep[count]=i
+        count+=1
+        
+        # 終了判定:idxの要素数が1のとき
+        if idx.size(0) == 1:
+            break
+        
+        # 末尾の要素を除外
+        idx = idx[:-1]
+
+        # idxに対応させたxmin, ymin, xmax, ymaxを抽出
+        torch.index_select(x1, 0, idx, out=tmp_x1)
+        torch.index_select(y1, 0, idx, out=tmp_y1)
+        torch.index_select(x2, 0, idx, out=tmp_x2)
+        torch.index_select(y2, 0, idx, out=tmp_y2)
+        
+        # idxのBBoxのxmin, ymin, xmax, ymaxを確信度が最大のBBoxの値まで切り詰める
+        tmp_x1 = torch.clamp(tmp_x1, min=x1[i])
+        tmp_y1 = torch.clamp(tmp_y1, min=y1[i])
+        tmp_x2 = torch.clamp(tmp_x2, min=x2[i])
+        tmp_y2 = torch.clamp(tmp_y2, min=y2[i])
+        
+        tmp_w = tmp_x2 - tmp_x1
+        tmp_h = tmp_y2 - tmp_y1
+        
+        # 2つの面積の集合積を計算
+        inter = tmp_w*tmp_h
+        
+        # areaからidxに残っている全てのBBoxを取得
+        rem_areas = torch.index_select(area, 0, idx)
+        # 2つの面積の集合和を計算
+        union = (rem_areas - inter) + area[i]
+        # IoUを計算
+        IoU = inter/union
+        
+        # overlap以下のIoUのidxだけ残す
+        idx = idx[IoU.le(overlap)]
+        
+    return keep, count
+        
