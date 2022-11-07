@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 from torch.autograd import Function
+import torch.nn.functional as F
 from itertools import product as product
 from math import sqrt as sqrt
 
@@ -340,3 +341,71 @@ class Detect(Function):
                                                    boxes[ids[:count]]), 1)
                 
         return output
+    
+class SSD(nn.Module):
+    def __init__(self, phase, cfg):
+        super(SSD, self).__init__()
+        
+        self.phase = phase
+        self.class_num = cfg["classes_num"]
+        
+        # SSDネットワークを生成
+        self.vgg = make_vgg()
+        self.extras = make_extras()
+        self.L2Norm = L2Norm()
+        self.loc = make_loc(cfg["dbox_num"])
+        self.conf = make_conf(cfg["classes_num"], cfg["dbox_num"])
+        
+        # DBoxの[cx, cy, width, height]を格納したTensor(8732, 4)を取得
+        dbox = DBox(cfg)
+        self.dbox_list = dbox.make_dbox_list()
+        
+        if phase == "test": # 推論モードのとき
+            self.detect = Detect.apply
+            
+        def forward(self, x):
+            """forward propagetion
+
+            Args:
+                x (Tensor): imageの4階テンソル(batch_size, 3, 300, 300)
+            """
+            
+            out_list = list() # out1～out6を格納
+            loc = list() # locの出力を格納
+            conf = list() # confの出力を格納
+            
+            # out1
+            for k in range(23):
+                x = self.vgg[k](x)
+                
+            out1 = self.L2Norm(x)
+            out_list.append(out1)
+            
+            for k in range(23, len(self.vgg)):
+                x = self.vgg[k](x)
+                
+            out_list.append(x)
+            
+            # out3～out6
+            for k,v in enumerate(self.extras):
+                x = F.relu(v(x), inplace=True)
+                if k % 2 ==1:
+                    out_list.append(x)
+                    
+            # loc, conf
+            for (x, l, c) in zip(out_list, self.loc, self.conf):
+                loc.append(l(x).permute(0, 2, 3, 1).contiguous())
+                conf.append(c(x).permute(0, 2, 3, 1).contiguous())
+                
+            loc = torch.cat([o.view(o.size(0), -1) for o in loc], l)
+            conf = torch.cat([o.view(o.size(0), -1) for o in conf], l)
+            
+            loc = loc.view(loc.size(0), -1, 4)
+            conf = conf.view(conf.size(0), -1, self.classes_num)
+            
+            output = (loc, conf, self.dbox_list)
+            
+            if self.phase == "test":
+                return self.detect(output[0], output[1], output[2])
+            else:
+                return output
